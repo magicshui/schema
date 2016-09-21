@@ -5,10 +5,9 @@ import (
 	"github.com/astaxie/flatmap"
 	"github.com/hashicorp/go-multierror"
 	"gopkg.in/asaskevich/govalidator.v4"
+	"reflect"
 	"regexp"
 	"strings"
-
-	"reflect"
 )
 
 type Schema struct {
@@ -29,26 +28,6 @@ func (s *Schema) EmptyMap() map[string]interface{} {
 	return result
 }
 
-func setValue2(data map[string]interface{}, paths []string, value interface{}) {
-	if len(paths) > 2 {
-		if paths[1] == "$" {
-			if _, found := data[paths[0]]; !found {
-				data[paths[0]] = make([]map[string]interface{}, 1)
-				data[paths[0]].([]map[string]interface{})[0] = make(map[string]interface{})
-			}
-			setValue(data[paths[0]].([]map[string]interface{})[0], paths[2:], value)
-		} else {
-			data[paths[0]] = make(map[string]interface{})
-			setValue(data[paths[0]].(map[string]interface{}), paths[1:], value)
-		}
-	} else {
-		if data == nil {
-			data = make(map[string]interface{})
-		}
-		data[paths[0]] = value
-	}
-}
-
 func (s *Schema) RegistValidator(tag string, f func(string) bool) {
 	govalidator.TagMap[tag] = govalidator.Validator(f)
 }
@@ -61,39 +40,6 @@ func (s *Schema) AddProperty(ps ...Property) {
 		s.Properties[p.Path] = p
 	}
 }
-
-type SchemaValidateResult struct {
-	validates map[string]error
-}
-
-func (s *SchemaValidateResult) Add(path string, errs error) {
-	if s.validates == nil {
-		s.validates = make(map[string]error)
-	}
-	if errs != nil {
-		s.validates[path] = errs
-	}
-}
-
-func (s SchemaValidateResult) String() string {
-	var r = ""
-	for _, v := range s.validates {
-		r += v.Error() + "\n"
-	}
-	return r
-}
-
-func (s SchemaValidateResult) Error() string {
-	return s.String()
-}
-
-func (s *SchemaValidateResult) Ok() bool {
-	return len(s.validates) == 0
-}
-
-var (
-	regDollar, _ = regexp.Compile("(\\.[0-9]+)")
-)
 
 func (s *Schema) Validate(data map[string]interface{}) (paths []string, errs SchemaValidateResult) {
 	flatData, err := flatmap.Flatten(data)
@@ -126,7 +72,6 @@ func (s *Schema) CleanFlatMap(data map[string]interface{}, paths []string) map[s
 	return data3
 }
 
-// FIXME: 这里了返回的数据是错误的
 func (s *Schema) CleanMap(data map[string]interface{}, paths []string) map[string]interface{} {
 	var data2 = make(map[string]interface{})
 	for _, path := range paths {
@@ -141,44 +86,7 @@ func (s *Schema) CleanMap(data map[string]interface{}, paths []string) map[strin
 	return data2
 }
 
-func setValue(data map[string]interface{}, paths []string, value interface{}) {
-	if len(paths) > 2 {
-		if paths[1] == "$" {
-			if _, found := data[paths[0]]; !found {
-				data[paths[0]] = make([]map[string]interface{}, 1)
-				data[paths[0]].([]map[string]interface{})[0] = make(map[string]interface{})
-			}
-			setValue(data[paths[0]].([]map[string]interface{})[0], paths[2:], value)
-		} else {
-			data[paths[0]] = make(map[string]interface{})
-			setValue(data[paths[0]].(map[string]interface{}), paths[1:], value)
-		}
-	} else {
-		if orgP, found := data[paths[0]]; !found {
-			if data == nil {
-				data = make(map[string]interface{})
-			}
-			data[paths[0]] = value
-		} else {
-			v := reflect.ValueOf(orgP)
-			if v.Kind() == reflect.Interface {
-				v = v.Elem()
-			}
-			switch v.Kind() {
-			case reflect.Bool,
-				reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
-				reflect.Float64, reflect.Float32,
-				reflect.String:
-				data[paths[0]] = []interface{}{orgP, value}
-			case reflect.Slice, reflect.Array:
-				data[paths[0]] = append(data[paths[0]].([]interface{}), value)
-			}
-
-		}
-
-	}
-}
-
+// TODO: 类型没有定义
 type Property struct {
 	Path      string
 	Type      string
@@ -222,4 +130,75 @@ func (p *Property) validateTag(data interface{}) (bool, error) {
 		}
 	}
 	return errs == nil, errs
+}
+
+type SchemaValidateResult struct {
+	validates map[string]error
+}
+
+func (s *SchemaValidateResult) Add(path string, errs error) {
+	if s.validates == nil {
+		s.validates = make(map[string]error)
+	}
+	if errs != nil {
+		s.validates[path] = errs
+	}
+}
+
+func (s SchemaValidateResult) String() string {
+	var r = ""
+	for _, v := range s.validates {
+		r += v.Error() + "\n"
+	}
+	return r
+}
+
+func (s SchemaValidateResult) Error() string {
+	return s.String()
+}
+
+func (s *SchemaValidateResult) Ok() bool {
+	return len(s.validates) == 0
+}
+
+var (
+	regDollar, _ = regexp.Compile("(\\.[0-9]+)")
+)
+
+func setValue(data map[string]interface{}, paths []string, value interface{}) {
+	if len(paths) > 2 {
+		if paths[1] == "$" {
+			if _, found := data[paths[0]]; !found {
+				data[paths[0]] = make([]map[string]interface{}, 1)
+				data[paths[0]].([]map[string]interface{})[0] = make(map[string]interface{})
+			}
+			setValue(data[paths[0]].([]map[string]interface{})[0], paths[2:], value)
+		} else {
+			data[paths[0]] = make(map[string]interface{})
+			setValue(data[paths[0]].(map[string]interface{}), paths[1:], value)
+		}
+	} else {
+		if orgP, found := data[paths[0]]; !found {
+			if data == nil {
+				data = make(map[string]interface{})
+			}
+			data[paths[0]] = value
+		} else {
+			v := reflect.ValueOf(orgP)
+			if v.Kind() == reflect.Interface {
+				v = v.Elem()
+			}
+			switch v.Kind() {
+			case reflect.Bool,
+				reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
+				reflect.Float64, reflect.Float32,
+				reflect.String:
+				data[paths[0]] = []interface{}{orgP, value}
+			case reflect.Slice, reflect.Array:
+				data[paths[0]] = append(data[paths[0]].([]interface{}), value)
+			}
+
+		}
+
+	}
 }
