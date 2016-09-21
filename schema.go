@@ -5,7 +5,6 @@ import (
 	"github.com/astaxie/flatmap"
 	"github.com/hashicorp/go-multierror"
 	"gopkg.in/asaskevich/govalidator.v4"
-	"log"
 	"regexp"
 	"strings"
 )
@@ -93,7 +92,7 @@ var (
 	regDollar, _ = regexp.Compile("(\\.[0-9]+)")
 )
 
-func (s *Schema) Validate(data map[string]interface{}) (errs SchemaValidateResult) {
+func (s *Schema) Validate(data map[string]interface{}) (paths []string, errs SchemaValidateResult) {
 	flatData, err := flatmap.Flatten(data)
 	if err != nil {
 		errs.Add(".", err)
@@ -106,20 +105,22 @@ func (s *Schema) Validate(data map[string]interface{}) (errs SchemaValidateResul
 			orgValue := v
 			ok, e := p.validateTag(orgValue)
 			if !ok {
-				log.Printf("%s validate error: %s", orgPath, e.Error())
-				delete(flatData, orgPath)
 				errs.Add(path, e)
+			} else {
+				paths = append(paths, orgPath)
 			}
-		} else {
-			delete(flatData, orgPath)
 		}
 	}
+	return paths, errs
+}
 
-	newData, _ := flatmap.Flatten(s.EmptyMap())
-
-	log.Printf("After Validate: \n %s", flatData)
-
-	return errs
+func (s *Schema) CleanFlatMap(data map[string]interface{}, paths []string) map[string]interface{} {
+	data2, _ := Flatten(data)
+	var data3 = make(map[string]interface{})
+	for _, v := range paths {
+		data3[v] = data2[v]
+	}
+	return data3
 }
 
 type Property struct {

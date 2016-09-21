@@ -76,13 +76,22 @@ func TestSchema(t *testing.T) {
 		}{{Name: "alphanum", IsParams: true, Params: []interface{}{13, 20}}},
 	}
 	sche.AddProperty(p1, p2)
-	errs := sche.Validate(map[string]interface{}{
+	var data = map[string]interface{}{
 		"hello":  1231,
 		"name":   "what",
 		"first":  []map[string]interface{}{map[string]interface{}{"name": 123}},
-		"second": []int{123, 1232},
-		"last":   map[string]interface{}{"t": "tt"}})
+		"second": []int64{123, 1232},
+		"last":   map[string]interface{}{"t": "tt"}}
+
+	ps, errs := sche.Validate(data)
 	t.Logf("%s", &errs)
+	t.Logf("%s", data)
+	data2, _ := Flatten(data)
+	t.Logf("%s", data2)
+
+	data3 := sche.CleanFlatMap(data, ps)
+	t.Logf("%s", data3)
+
 }
 
 func TestSchemaEmpty(t *testing.T) {
