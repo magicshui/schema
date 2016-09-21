@@ -35,7 +35,6 @@ func flatten(result FlatMap, prefix string, v reflect.Value) (err error) {
 		reflect.Float64, reflect.Float32,
 		reflect.String:
 		result[prefix] = v.Interface()
-		result[prefix] = v.String()
 
 	case reflect.Map:
 		err = flattenMap(result, prefix, v)

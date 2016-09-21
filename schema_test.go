@@ -67,13 +67,14 @@ func TestSchema(t *testing.T) {
 		}{{Name: "stringlength", IsParams: true, Params: []interface{}{3, 20}}},
 	}
 	var p2 = Property{
-		Path: "second.$",
+		Path:    "second.$",
+		Default: []int{123123},
 		Validator: []struct {
 			Name     string
 			Params   []interface{}
 			IsCustom bool
 			IsParams bool
-		}{{Name: "alphanum", IsParams: true, Params: []interface{}{13, 20}}},
+		}{{Name: "alphanum", IsParams: false, Params: []interface{}{13, 20}}},
 	}
 	sche.AddProperty(p1, p2)
 	var data = map[string]interface{}{
@@ -83,15 +84,17 @@ func TestSchema(t *testing.T) {
 		"second": []int64{123, 1232},
 		"last":   map[string]interface{}{"t": "tt"}}
 
-	ps, errs := sche.Validate(data)
-	t.Logf("%s", &errs)
-	t.Logf("%s", data)
+	ps, _ := sche.Validate(data)
+	t.Logf("Validate: %s", data)
 	data2, _ := Flatten(data)
-	t.Logf("%s", data2)
+	t.Logf("Flatten: %s", data2)
 
 	data3 := sche.CleanFlatMap(data, ps)
-	t.Logf("%s", data3)
+	t.Logf("CleanFlatMap: %s", data3)
 
+	data4 := sche.CleanMap(data3, ps)
+	data5, _ := json.Marshal(data4)
+	t.Logf("CleanMap: %s", data5)
 }
 
 func TestSchemaEmpty(t *testing.T) {

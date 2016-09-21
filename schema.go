@@ -7,6 +7,8 @@ import (
 	"gopkg.in/asaskevich/govalidator.v4"
 	"regexp"
 	"strings"
+
+	"reflect"
 )
 
 type Schema struct {
@@ -15,6 +17,7 @@ type Schema struct {
 
 func (s *Schema) EmptyMap() map[string]interface{} {
 	var result = make(map[string]interface{})
+
 	for path, p := range s.Properties {
 		if !strings.Contains(path, ".") {
 			result[path] = p.Default
@@ -26,7 +29,7 @@ func (s *Schema) EmptyMap() map[string]interface{} {
 	return result
 }
 
-func setValue(data map[string]interface{}, paths []string, value interface{}) {
+func setValue2(data map[string]interface{}, paths []string, value interface{}) {
 	if len(paths) > 2 {
 		if paths[1] == "$" {
 			if _, found := data[paths[0]]; !found {
@@ -121,6 +124,59 @@ func (s *Schema) CleanFlatMap(data map[string]interface{}, paths []string) map[s
 		data3[v] = data2[v]
 	}
 	return data3
+}
+
+// FIXME: 这里了返回的数据是错误的
+func (s *Schema) CleanMap(data map[string]interface{}, paths []string) map[string]interface{} {
+	var data2 = make(map[string]interface{})
+	for _, path := range paths {
+		if !strings.Contains(path, ".") {
+			data2[path] = data[path]
+		} else {
+			newPath := regDollar.ReplaceAllString(path, ".$")
+			paths := strings.Split(newPath, ".")
+			setValue2(data2, paths, data[path])
+		}
+	}
+	return data2
+}
+
+func setValue(data map[string]interface{}, paths []string, value interface{}) {
+	if len(paths) > 2 {
+		if paths[1] == "$" {
+			if _, found := data[paths[0]]; !found {
+				data[paths[0]] = make([]map[string]interface{}, 1)
+				data[paths[0]].([]map[string]interface{})[0] = make(map[string]interface{})
+			}
+			setValue(data[paths[0]].([]map[string]interface{})[0], paths[2:], value)
+		} else {
+			data[paths[0]] = make(map[string]interface{})
+			setValue(data[paths[0]].(map[string]interface{}), paths[1:], value)
+		}
+	} else {
+		if orgP, found := data[paths[0]]; !found {
+			if data == nil {
+				data = make(map[string]interface{})
+			}
+			data[paths[0]] = value
+		} else {
+			v := reflect.ValueOf(orgP)
+			if v.Kind() == reflect.Interface {
+				v = v.Elem()
+			}
+			switch v.Kind() {
+			case reflect.Bool,
+				reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
+				reflect.Float64, reflect.Float32,
+				reflect.String:
+				data[paths[0]] = []interface{}{orgP, value}
+			case reflect.Slice, reflect.Array:
+				data[paths[0]] = append(data[paths[0]].([]interface{}), value)
+			}
+
+		}
+
+	}
 }
 
 type Property struct {
