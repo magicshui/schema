@@ -80,7 +80,7 @@ func (s *Schema) CleanMap(data map[string]interface{}, paths []string) map[strin
 		} else {
 			newPath := regDollar.ReplaceAllString(path, ".$")
 			paths := strings.Split(newPath, ".")
-			setValue2(data2, paths, data[path])
+			setValue(data2, paths, data[path])
 		}
 	}
 	return data2
